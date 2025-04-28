@@ -2,43 +2,16 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-frontend:
-  replicaCount: 1
-  image:
-    repository: k8sf/stock-scanner-front
-    pullPolicy: IfNotPresent
-    tag: "latest"
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 100m
-      memory: 256Mi
-  livenessProbe:
-    httpGet:
-      path: /
-      port: 80
-    initialDelaySeconds: 10
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-  readinessProbe:
-    httpGet:
-      path: /
-      port: 80
-    initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 3
-    failureThreshold: 3
+replicaCount: 1
 
+# 命名空间
+nameOverride: "stock-scanner"
+fullnameOverride: "stock-scanner"
+
+# 后端服务配置
 backend:
-  replicaCount: 1
   image:
-    repository: k8sf/stock-scanner-end
+    repository: k8sf/stock-scanner
     pullPolicy: IfNotPresent
     tag: "latest"
   service:
@@ -69,17 +42,23 @@ backend:
     failureThreshold: 3
   env:
     - name: API_KEY
-      value: ""
+      value: "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"
     - name: API_URL
-      value: ""
+      value: "https://openrouter.ai/api"
     - name: API_MODEL
-      value: "gpt-4"
+      value: "google/gemini-2.5-pro-exp-03-25"
     - name: API_TIMEOUT
       value: "60"
-    - name: LOGIN_PASSWORD
-      value: ""
+    - name: TOKEN
+      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
     - name: ANNOUNCEMENT_TEXT
       value: "欢迎使用股票分析系统"
+    - name: MODE
+      value: "DEBUG"
+    - name: LOG_LEVEL
+      value: "TRACE"
+    - name: USER_TOKEN
+      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
   persistence:
     enabled: true
     storageClass: ""
@@ -90,9 +69,13 @@ backend:
     logs:
       mountPath: /app/logs
 
+# 服务配置
+service:
+  type: ClusterIP
+  port: 80
+  backendPort: 8888
+
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -119,25 +102,22 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
+# Ingress配置
 ingress:
   enabled: true
-  className: "nginx"
+  className: "traefik"
   annotations:
-    kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+    kubernetes.io/ingress.class: traefik
   hosts:
-    - host: stock-scanner.local
+    - host: stock-scanner.xiongjuli.com
       paths:
-        - path: /api
-          pathType: Prefix
-          service: backend
         - path: /
           pathType: Prefix
-          service: frontend
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
+          service: backend
+  tls:
+    - secretName: xiongjuli-com-tls
+      hosts:
+        - stock-scanner.xiongjuli.com
 
 autoscaling:
   enabled: false
@@ -149,17 +129,23 @@ autoscaling:
 # 环境变量配置
 env:
   - name: API_KEY
-    value: ""
+    value: "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"
   - name: API_URL
-    value: ""
+    value: "https://openrouter.ai/api"
   - name: API_MODEL
-    value: "gpt-4"
+    value: "google/gemini-2.5-pro-exp-03-25"
   - name: API_TIMEOUT
     value: "60"
-  - name: LOGIN_PASSWORD
-    value: ""
+  - name: TOKEN
+    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
   - name: ANNOUNCEMENT_TEXT
     value: "欢迎使用股票分析系统"
+  - name: MODE
+    value: "DEBUG"
+  - name: LOG_LEVEL
+    value: "TRACE"
+  - name: USER_TOKEN
+    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
 
 # 持久卷配置
 persistence:
@@ -184,6 +170,15 @@ volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
+
+# 资源配置
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
 
 nodeSelector: {}
 

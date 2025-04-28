@@ -4,15 +4,97 @@
 
 replicaCount: 1
 
-image:
-  repository: k8sf/stock-scanner
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+# 命名空间
+nameOverride: "stock-scanner"
+fullnameOverride: "stock-scanner"
+
+frontend:
+  image:
+    repository: k8sf/stock-scanner-front
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 80
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+backend:
+  image:
+    repository: k8sf/stock-scanner-end
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 8888
+  livenessProbe:
+    httpGet:
+      path: /api/config
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /api/config
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    data:
+      mountPath: /app/data
+    logs:
+      mountPath: /app/logs
+  env:
+    - name: API_KEY
+      value: "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"
+    - name: API_URL
+      value: "https://openrouter.ai/api"
+    - name: API_MODEL
+      value: "google/gemini-2.5-pro-exp-03-25"
+    - name: API_TIMEOUT
+      value: "60"
+    - name: TOKEN
+      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+    - name: MODE
+      value: "DEBUG"
+    - name: LOG_LEVEL
+      value: "TRACE"
+    - name: ANNOUNCEMENT_TEXT
+      value: "欢迎使用股票分析系统"
+    - name: USER_TOKEN
+      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+
+service:
+  type: ClusterIP
+  port: 80
+  backendPort: 8888
 
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -36,33 +118,22 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
-service:
-  type: ClusterIP
-  port: 8888
-
+# Ingress配置
 ingress:
   enabled: true
-  className: "nginx"
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+  className: "traefik"
+  annotations:
+    kubernetes.io/ingress.class: traefik
   hosts:
-    - host: stock-scanner.local
+    - host: stock-scanner.xiongjuli.com
       paths:
         - path: /
-          pathType: ImplementationSpecific
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-resources: {}
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: xiongjuli-com-tls
+      hosts:
+        - stock-scanner.xiongjuli.com
 
 autoscaling:
   enabled: false
@@ -74,23 +145,23 @@ autoscaling:
 # 环境变量配置
 env:
   - name: API_KEY
-    value: "填写你的API密钥"
+    value: "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"
   - name: API_URL
-    value: "填写你的API地址"
+    value: "https://openrouter.ai/api"
   - name: API_MODEL
-    value: "gpt-4"
+    value: "google/gemini-2.5-pro-exp-03-25"
   - name: API_TIMEOUT
     value: "60"
   - name: TOKEN
-    value: "填写你的API认证令牌"
-  - name: MODE
-    value: "RELEASE"
-  - name: LOG_LEVEL
-    value: "INFO"
+    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
   - name: ANNOUNCEMENT_TEXT
     value: "欢迎使用股票分析系统"
+  - name: MODE
+    value: "DEBUG"
+  - name: LOG_LEVEL
+    value: "TRACE"
   - name: USER_TOKEN
-    value: ""
+    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
 
 # 持久化存储配置
 persistence:
@@ -111,6 +182,15 @@ persistence:
   
   ## 存储注解
   annotations: {}
+
+# 资源配置
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
 
 nodeSelector: {}
 

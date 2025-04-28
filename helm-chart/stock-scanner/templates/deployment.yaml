@@ -1,23 +1,20 @@
-{{- $frontendFullname := printf "%s-frontend" (include "stock-scanner.fullname" .) }}
-{{- $backendFullname := printf "%s-backend" (include "stock-scanner.fullname" .) }}
+{{- $fullname := include "stock-scanner.fullname" . }}
 
 ---
-# 前端部署
+# 单一Pod部署（FastAPI后端提供前端静态文件）
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $frontendFullname }}
+  name: {{ $fullname }}
   labels:
     {{- include "stock-scanner.labels" . | nindent 4 }}
-    app.kubernetes.io/component: frontend
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.frontend.replicaCount }}
+  replicas: {{ .Values.replicaCount | default 1 }}
   {{- end }}
   selector:
     matchLabels:
       {{- include "stock-scanner.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: frontend
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -26,7 +23,6 @@ spec:
       {{- end }}
       labels:
         {{- include "stock-scanner.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: frontend
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -39,72 +35,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-frontend
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-          livenessProbe:
-            {{- toYaml .Values.frontend.livenessProbe | nindent 12 }}
-          readinessProbe:
-            {{- toYaml .Values.frontend.readinessProbe | nindent 12 }}
-          resources:
-            {{- toYaml .Values.frontend.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-
----
-# 后端部署
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ $backendFullname }}
-  labels:
-    {{- include "stock-scanner.labels" . | nindent 4 }}
-    app.kubernetes.io/component: backend
-spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.backend.replicaCount }}
-  {{- end }}
-  selector:
-    matchLabels:
-      {{- include "stock-scanner.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: backend
-  template:
-    metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "stock-scanner.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: backend
-        {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "stock-scanner.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      containers:
+        # 后端容器（同时提供前端静态文件）
         - name: {{ .Chart.Name }}-backend
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -138,10 +69,10 @@ spec:
         {{- if .Values.backend.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
-            claimName: {{ $backendFullname }}-data
+            claimName: {{ $fullname }}-data
         - name: logs
           persistentVolumeClaim:
-            claimName: {{ $backendFullname }}-logs
+            claimName: {{ $fullname }}-logs
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

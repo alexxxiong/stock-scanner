@@ -1,9 +1,7 @@
 {{- if .Values.ingress.enabled -}}
 {{- $fullName := include "stock-scanner.fullname" . -}}
-{{- $frontendServiceName := printf "%s-frontend" $fullName -}}
-{{- $backendServiceName := printf "%s-backend" $fullName -}}
-{{- $frontendServicePort := .Values.frontend.service.port -}}
-{{- $backendServicePort := .Values.backend.service.port -}}
+{{- $servicePort := .Values.service.port -}}
+{{- $backendServicePort := .Values.service.backendPort -}}
 {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
@@ -52,18 +50,12 @@ spec:
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
               service:
-                {{- if eq .service "frontend" }}
-                name: {{ $frontendServiceName }}
+                name: {{ $fullName }}
                 port:
-                  number: {{ $frontendServicePort }}
-                {{- else if eq .service "backend" }}
-                name: {{ $backendServiceName }}
-                port:
-                  number: {{ $backendServicePort }}
-                {{- end }}
+                  number: {{ if eq (.service | default "frontend") "frontend" }}{{ $servicePort }}{{ else }}{{ $backendServicePort }}{{ end }}
               {{- else }}
-              serviceName: {{ if eq .service "frontend" }}{{ $frontendServiceName }}{{ else }}{{ $backendServiceName }}{{ end }}
-              servicePort: {{ if eq .service "frontend" }}{{ $frontendServicePort }}{{ else }}{{ $backendServicePort }}{{ end }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ if eq (.service | default "frontend") "frontend" }}{{ $servicePort }}{{ else }}{{ $backendServicePort }}{{ end }}
               {{- end }}
           {{- end }}
     {{- end }}

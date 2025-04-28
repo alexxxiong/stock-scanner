@@ -48,13 +48,13 @@ metadata:
     app.kubernetes.io/component: backend
 spec:
   accessModes:
-    - {{ .Values.backend.persistence.accessMode }}
-  {{- if .Values.backend.persistence.storageClass }}
-  storageClassName: {{ .Values.backend.persistence.storageClass }}
+    - {{ .Values.persistence.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.backend.persistence.size }}
+      storage: {{ .Values.persistence.size | default "5Gi" }}
 
 ---
 apiVersion: v1
@@ -66,11 +66,11 @@ metadata:
     app.kubernetes.io/component: backend
 spec:
   accessModes:
-    - {{ .Values.backend.persistence.accessMode }}
-  {{- if .Values.backend.persistence.storageClass }}
-  storageClassName: {{ .Values.backend.persistence.storageClass }}
+    - {{ .Values.persistence.accessMode | default "ReadWriteOnce" }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
   {{- end }}
   resources:
     requests:
-      storage: {{ .Values.backend.persistence.size }}
+      storage: {{ .Values.persistence.size | default "5Gi" }}
 {{- end }} 
