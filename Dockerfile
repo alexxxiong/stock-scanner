@@ -17,7 +17,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # 阶段二: 构建Python后端
-FROM python:3.10-slim as backend-builder
+FROM python:3.9-slim as backend-builder
 
 # 设置工作目录
 WORKDIR /app
@@ -33,10 +33,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/
 
 # 安装 Python 依赖
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 阶段三: 运行阶段
-FROM python:3.10-slim
+FROM python:3.9-slim
 
 # 设置工作目录
 WORKDIR /app
@@ -62,6 +62,17 @@ COPY . /app/
 # 从前端构建阶段复制生成的静态文件到后端的前端目录
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
+# 设置环境变量
+ENV API_KEY=""
+ENV API_URL=""
+ENV API_MODEL="gpt-4"
+ENV API_TIMEOUT="60"
+ENV TOKEN=""
+ENV MODE="RELEASE"
+ENV LOG_LEVEL="INFO"
+ENV ANNOUNCEMENT_TEXT="欢迎使用股票分析系统"
+ENV USER_TOKEN=""
+
 # 暴露端口
 EXPOSE 8888
 
@@ -70,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8888/api/config || exit 1
 
 # 启动命令
-CMD ["python", "web_server.py"]
+CMD ["python", "main.py"]

@@ -15,8 +15,11 @@ services:
       - API_URL=${API_URL}
       - API_MODEL=${API_MODEL}
       - API_TIMEOUT=${API_TIMEOUT}
-      - LOGIN_PASSWORD=${LOGIN_PASSWORD}
+      - TOKEN=${TOKEN}
+      - MODE=${MODE}
+      - LOG_LEVEL=${LOG_LEVEL}
       - ANNOUNCEMENT_TEXT=${ANNOUNCEMENT_TEXT}
+      - USER_TOKEN=${USER_TOKEN}
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped

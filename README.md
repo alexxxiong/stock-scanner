@@ -140,3 +140,69 @@ docker-compose up -d
 
 ## 免责声明 (Disclaimer)
 本系统仅用于学习和研究目的，投资有风险，入市需谨慎。
+
+## 功能增强与更新
+
+1. 支持DEBUG模式与API文档：通过设置`MODE=DEBUG`环境变量启用Swagger UI文档
+2. 可配置的日志详细程度：通过`LOG_LEVEL=TRACE`启用详细堆栈跟踪
+3. 简化的API认证：使用`TOKEN`直接进行身份验证，无需JWT
+4. AI服务连接使用`USER_TOKEN`环境变量
+
+## 环境变量说明
+
+| 环境变量 | 描述 | 默认值 |
+|---------|------|-------|
+| API_KEY | AI服务API密钥 | - |
+| API_URL | AI服务API地址 | - |
+| API_MODEL | AI服务使用的模型 | gpt-4 |
+| API_TIMEOUT | API请求超时时间(秒) | 60 |
+| TOKEN | API认证令牌 | - |
+| USER_TOKEN | 连接外部AI服务的Token | - |
+| MODE | 应用模式，设为DEBUG启用API文档 | RELEASE |
+| LOG_LEVEL | 日志级别，设为TRACE启用详细堆栈跟踪 | INFO |
+| ANNOUNCEMENT_TEXT | 公告内容 | - |
+
+## K8s部署
+
+使用提供的Helm Chart进行部署:
+
+```bash
+# 使用自定义配置
+helm install stock-scanner ./stock-scanner -f value.yaml -n stock-scanner
+```
+
+## 本地开发
+
+1. 创建并配置.env文件:
+
+```
+# API配置
+API_KEY=你的API密钥
+API_URL=https://api.openai.com/v1
+API_MODEL=gpt-4
+API_TIMEOUT=60
+
+# 认证配置
+TOKEN=你的认证令牌
+USER_TOKEN=你的AI服务认证令牌
+
+# 调试配置
+MODE=DEBUG  # 启用API文档
+LOG_LEVEL=TRACE  # 启用详细日志
+
+# 界面配置
+ANNOUNCEMENT_TEXT=欢迎使用股票分析系统！
+```
+
+2. 使用Docker Compose部署:
+
+```bash
+docker-compose -f docker-compose.simple.yml up -d
+```
+
+## API文档
+
+当`MODE=DEBUG`时，可通过以下地址访问API文档:
+
+- Swagger UI: http://localhost:8888/docs 
+- OpenAPI JSON: http://localhost:8888/openapi.json

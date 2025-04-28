@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import uvicorn
 import json
 import secrets
+import traceback
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 
@@ -23,6 +24,10 @@ load_dotenv()
 
 # 获取日志器
 logger = get_logger()
+
+# 日志级别
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+TRACE_ENABLED = LOG_LEVEL == "TRACE"
 
 # JWT相关配置
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_hex(32))
@@ -35,11 +40,15 @@ print(LOGIN_PASSWORD)
 # 是否需要登录
 REQUIRE_LOGIN = bool(LOGIN_PASSWORD.strip())
 
+MODE = os.getenv("MODE", "RELEASE")
 
 app = FastAPI(
     title="Stock Scanner API",
     description="异步股票分析API",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url="/docs" if MODE == "DEBUG" else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if MODE == "DEBUG" else None
 )
 
 # 添加CORS中间件
@@ -65,10 +74,10 @@ class AnalyzeRequest(BaseModel):
     api_timeout: Optional[str] = None
 
 class TestAPIRequest(BaseModel):
-    api_url: str
-    api_key: str
-    api_model: Optional[str] = None
-    api_timeout: Optional[int] = 10
+    api_url: str = Field(..., example="https://api.openai.com/v1")
+    api_key: str = Field(..., example="sk-xxxxxx")
+    api_model: Optional[str] = Field(None, example="gpt-4")
+    api_timeout: Optional[int] = Field(10, example=10)
 
 class LoginRequest(BaseModel):
     password: str
@@ -105,53 +114,23 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 # 验证令牌
 async def verify_token(token: Optional[str] = Depends(optional_oauth2_scheme)):
-    # 如果未设置密码，则不需要验证
     if not REQUIRE_LOGIN:
         return "guest"
-        
-    # 如果没有token且不需要登录，返回guest
-    if token is None and not REQUIRE_LOGIN:
-        return "guest"
-        
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="无效的认证凭据",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    # 如果需要登录但没有token，抛出异常
     if token is None:
-        raise credentials_exception
-        
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        return username
-    except JWTError:
-        raise credentials_exception
+        return "guest"
+    if token != LOGIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="无效的TOKEN")
+    return "user"
 
-# 用户登录接口
+# 用户登录接口（简化为直接比对TOKEN）
 @app.post("/api/login")
 async def login(request: LoginRequest):
-    """用户登录接口"""
-    # 如果未设置密码，表示不需要登录
-    if not REQUIRE_LOGIN:
-        access_token = create_access_token(data={"sub": "guest"})
-        return {"access_token": access_token, "token_type": "bearer"}
-        
+    """用户登录接口，直接比对TOKEN"""
     if request.password != LOGIN_PASSWORD:
-        logger.warning("登录失败：密码错误")
-        raise HTTPException(status_code=401, detail="密码错误")
-    
-    # 创建访问令牌
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": "user"}, expires_delta=access_token_expires
-    )
+        logger.warning("登录失败：TOKEN错误")
+        raise HTTPException(status_code=401, detail="TOKEN错误")
     logger.info("用户登录成功")
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": LOGIN_PASSWORD, "token_type": "bearer"}
 
 # 检查用户认证状态
 @app.get("/api/check_auth")
@@ -256,7 +235,11 @@ async def analyze(request: AnalyzeRequest, username: str = Depends(verify_token)
     except Exception as e:
         error_msg = f"分析时出错: {str(e)}"
         logger.error(error_msg)
-        logger.exception(e)
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
         raise HTTPException(status_code=500, detail=error_msg)
 
 # 搜索美股代码
@@ -272,6 +255,11 @@ async def search_us_stocks(keyword: str = "", username: str = Depends(verify_tok
         
     except Exception as e:
         logger.error(f"搜索美股代码时出错: {str(e)}")
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # 搜索基金代码
@@ -287,6 +275,11 @@ async def search_funds(keyword: str = "", market_type: str = "", username: str =
         
     except Exception as e:
         logger.error(f"搜索基金代码时出错: {str(e)}")
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # 获取美股详情
@@ -302,6 +295,11 @@ async def get_us_stock_detail(symbol: str, username: str = Depends(verify_token)
         
     except Exception as e:
         logger.error(f"获取美股详情时出错: {str(e)}")
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # 获取基金详情
@@ -317,6 +315,11 @@ async def get_fund_detail(symbol: str, market_type: str = "ETF", username: str =
         
     except Exception as e:
         logger.error(f"获取基金详情时出错: {str(e)}")
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 # 测试API连接
@@ -343,6 +346,7 @@ async def test_api_connection(request: TestAPIRequest, username: str = Depends(v
         # 构建API URL
         test_url = APIUtils.format_api_url(api_url)
         logger.debug(f"完整API测试URL: {test_url}")
+        print(f"完整API测试URL: {test_url}")
         
         # 使用异步HTTP客户端发送测试请求
         async with httpx.AsyncClient(timeout=float(api_timeout)) as client:
@@ -376,16 +380,45 @@ async def test_api_connection(request: TestAPIRequest, username: str = Depends(v
             
     except httpx.RequestError as e:
         logger.error(f"API 连接请求错误: {str(e)}")
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)  # 仅在非TRACE模式下使用exception
+        
+        response_content = {
+            "success": False, 
+            "message": f"请求错误: {str(e)}"
+        }
+        
+        # 仅在TRACE模式下添加trace
+        if TRACE_ENABLED:
+            response_content["trace"] = traceback.format_exc()
+            
         return JSONResponse(
             status_code=400,
-            content={"success": False, "message": f"请求错误: {str(e)}"}
+            content=response_content
         )
     except Exception as e:
         logger.error(f"测试 API 连接时出错: {str(e)}")
-        logger.exception(e)
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
+            
+        response_content = {
+            "success": False,
+            "message": f"API 测试连接时出错: {str(e)}"
+        }
+        
+        # 仅在TRACE模式下添加trace
+        if TRACE_ENABLED:
+            response_content["trace"] = traceback.format_exc()
+            
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": f"API 测试连接时出错: {str(e)}"}
+            content=response_content
         )
 
 # 检查是否需要登录

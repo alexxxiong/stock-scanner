@@ -265,14 +265,24 @@ class AIAnalyzer:
                                         # 尝试解析JSON
                                         chunk_data = json.loads(line)
                                         
+                                        # 健壮性处理：choices为空时直接报错并continue
+                                        choices = chunk_data.get("choices", [])
+                                        if not choices:
+                                            # logger.error(f"AI返回choices为空，原始数据: {chunk_data}")
+                                            # yield json.dumps({
+                                            #     "stock_code": stock_code,
+                                            #     "error": "AI返回choices为空，分析失败",
+                                            #     "status": "error"
+                                            # })
+                                            continue
                                         # 检查是否有finish_reason
-                                        finish_reason = chunk_data.get("choices", [{}])[0].get("finish_reason")
+                                        finish_reason = choices[0].get("finish_reason")
                                         if finish_reason == "stop":
                                             logger.debug("收到finish_reason=stop，流结束")
                                             continue
                                         
                                         # 获取delta内容
-                                        delta = chunk_data.get("choices", [{}])[0].get("delta", {})
+                                        delta = choices[0].get("delta", {})
                                         
                                         # 检查delta是否为空对象
                                         if not delta or delta == {}:
@@ -376,9 +386,12 @@ class AIAnalyzer:
                     
         except Exception as e:
             logger.error(f"AI分析出错: {str(e)}", exc_info=True)
+            import traceback
+            trace = traceback.format_exc()
+            logger.error(f"错误堆栈:\n{trace}")
             yield json.dumps({
                 "stock_code": stock_code,
-                "error": f"分析出错: {str(e)}",
+                "error": f"分析出错: {str(e)}\n堆栈信息: {trace}",
                 "status": "error"
             })
             
