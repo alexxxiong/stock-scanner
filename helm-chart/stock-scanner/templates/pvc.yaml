@@ -33,4 +33,44 @@ spec:
   resources:
     requests:
       storage: {{ .Values.persistence.size }}
+{{- end }}
+
+{{- if .Values.backend.persistence.enabled }}
+{{- $backendFullname := printf "%s-backend" (include "stock-scanner.fullname" .) }}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $backendFullname }}-data
+  labels:
+    {{- include "stock-scanner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - {{ .Values.backend.persistence.accessMode }}
+  {{- if .Values.backend.persistence.storageClass }}
+  storageClassName: {{ .Values.backend.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.persistence.size }}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $backendFullname }}-logs
+  labels:
+    {{- include "stock-scanner.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  accessModes:
+    - {{ .Values.backend.persistence.accessMode }}
+  {{- if .Values.backend.persistence.storageClass }}
+  storageClassName: {{ .Values.backend.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backend.persistence.size }}
 {{- end }} 
