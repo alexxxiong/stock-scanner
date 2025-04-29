@@ -1,40 +1,37 @@
-# 本地打包使用国内镜像源加速下载， 默认不使用，影响github actions 
-# --index-url https://pypi.tuna.tsinghua.edu.cn/simple
-
 # 基础科学计算和数据处理库
-numpy==1.24.3
-pandas==2.0.3
-scipy==1.10.1
+numpy>=1.24.3
+pandas>=2.0.3
+scipy>=1.10.1
 
 # 数据获取和分析库
-akshare==1.16.83
+akshare>=1.16.83
 tushare>=1.2.0
-tqdm==4.67.1
+tqdm>=4.67.1
 
 # Web框架与异步处理
-fastapi==0.115.11
-uvicorn[standard]==0.34.0
-pydantic==2.10.6
-httpx==0.28.1
+fastapi>=0.115.11
+uvicorn[standard]>=0.34.0
+pydantic>=2.10.6
+httpx>=0.28.1
 
 # 环境配置
-python-dotenv==1.0.1
+python-dotenv>=1.0.1
 
 # 日志和系统工具
-loguru==0.7.2
+loguru>=0.7.2
 
 # 可选：数据可视化（未来扩展）
-matplotlib==3.7.2
-seaborn==0.13.2
+matplotlib>=3.7.2
+seaborn>=0.13.2
 
 # 开发和调试工具
 ipython>=7.34.0
 
 # 其他依赖
-beautifulsoup4==4.12.3
-html5lib==1.1
-lxml==4.9.4
-jsonpath==0.82.2
-openpyxl==3.1.5
-python-jose[cryptography]==3.4.0
-passlib==1.7.4
+beautifulsoup4>=4.12.3
+html5lib>=1.1
+lxml>=4.9.4
+jsonpath>=0.82.2
+openpyxl>=3.1.5
+python-jose[cryptography]>=3.4.0
+passlib>=1.7.4

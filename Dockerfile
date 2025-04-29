@@ -1,77 +1,68 @@
-# 阶段一: 构建Vue前端
-FROM node:18-alpine as frontend-builder
+# 第一阶段：前端构建阶段
+FROM node:20-alpine AS frontend-builder
 
 # 设置工作目录
 WORKDIR /app/frontend
 
-# 复制前端项目文件
-COPY frontend/package*.json ./
+# 复制前端代码
+COPY frontend/package.json frontend/yarn.lock ./
 
 # 安装依赖
-RUN npm ci
+RUN yarn install --frozen-lockfile
 
 # 复制前端源代码
-COPY frontend/ ./
+COPY frontend/src ./src
+COPY frontend/public ./public
+COPY frontend/index.html ./
+COPY frontend/tsconfig*.json ./
+COPY frontend/vite.config.ts ./
 
-# 构建前端应用
-RUN npm run build
+# 构建前端
+RUN yarn build
 
-# 阶段二: 构建Python后端
-FROM python:3.9-slim as backend-builder
-
-# 设置工作目录
-WORKDIR /app
-
-# 安装系统依赖和构建依赖
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    ca-certificates \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# 复制项目文件
-COPY requirements.txt /app/
-
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 阶段三: 运行阶段
-FROM python:3.9-slim
+# 第二阶段：后端构建阶段
+FROM ghcr.io/astral-sh/uv:alpine AS backend-builder
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装运行时依赖
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# 安装构建依赖
+RUN apk add --no-cache \
+    libxml2-dev \
+    libxslt-dev \
+    gcc \
+    python3-dev \
+    musl-dev
 
-# 从构建阶段复制Python依赖
-COPY --from=backend-builder /root/.local /root/.local
+# 复制依赖文件
+COPY requirements.txt .
+COPY pyproject.toml .
+COPY web_server.py .
+COPY utils/ ./utils/
+COPY services/ ./services/
 
-# 确保脚本路径在PATH中
-ENV PATH=/root/.local/bin:$PATH
+# 创建虚拟环境并安装Python依赖
+RUN uv venv /app/.venv --python 3.10 && \
+    uv pip install --no-cache-dir -r requirements.txt
 
-# 设置环境变量
-ENV PYTHONPATH=/app
+# 从前端构建阶段复制构建后的文件
+COPY --from=frontend-builder /app/frontend/dist/ /app/frontend/dist/
 
-# 复制应用代码
-COPY . /app/
+# 创建必要的目录
+RUN mkdir -p /app/data /app/logs && \
+    chmod -R 755 /app/data /app/logs
 
-# 从前端构建阶段复制生成的静态文件到后端的前端目录
-COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
-
-# 设置环境变量
-ENV API_KEY=""
-ENV API_URL=""
-ENV API_MODEL="gpt-4"
-ENV API_TIMEOUT="60"
-ENV TOKEN=""
-ENV MODE="RELEASE"
-ENV LOG_LEVEL="INFO"
-ENV ANNOUNCEMENT_TEXT="欢迎使用股票分析系统"
-ENV USER_TOKEN=""
+# # 设置默认环境变量（可被.env文件覆盖）
+# ENV API_KEY=""
+# ENV API_URL=""
+# ENV API_MODEL="gpt-4"
+# ENV API_TIMEOUT="60"
+# ENV TOKEN=""
+# ENV MODE="RELEASE"
+# ENV LOG_LEVEL="INFO"
+# ENV ANNOUNCEMENT_TEXT="欢迎使用股票分析系统"
+# ENV USER_TOKEN=""
+# ENV TUSHARE_TOKEN=""
 
 # 暴露端口
 EXPOSE 8888
@@ -81,4 +72,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8888/api/config || exit 1
 
 # 启动命令
-CMD ["python", "main.py"]
+ENTRYPOINT ["uv", "run", "web_server.py"] 

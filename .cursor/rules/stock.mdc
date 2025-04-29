@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- 用uv运行
+- 如果库不存在，调试好后，需要加入requirements.txt
+- 如果是调试，调试完毕，请停止服务
