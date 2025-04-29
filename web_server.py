@@ -8,6 +8,7 @@ from typing import List, Optional, Dict, Any, Generator
 from services.stock_analyzer_service import StockAnalyzerService
 from services.us_stock_service_async import USStockServiceAsync
 from services.fund_service_async import FundServiceAsync
+from services.a_stock_list_service import AStockListService
 import os
 import httpx
 from utils.logger import get_logger
@@ -63,6 +64,7 @@ app.add_middleware(
 # 初始化异步服务
 us_stock_service = USStockServiceAsync()
 fund_service = FundServiceAsync()
+a_stock_list_service = AStockListService()
 
 # 定义请求和响应模型
 class AnalyzeRequest(BaseModel):
@@ -111,6 +113,20 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     results: List[SearchResult] = Field(..., description="搜索结果列表")
+
+class AStockListItem(BaseModel):
+    ts_code: str = Field(..., description="股票代码（带市场后缀，如000001.SZ）", example="000001.SZ")
+    symbol: str = Field(..., description="股票代码（不带后缀）", example="000001")
+    name: str = Field(..., description="股票名称", example="平安银行")
+    area: Optional[str] = Field(None, description="地区", example="深圳")
+    industry: Optional[str] = Field(None, description="行业", example="银行")
+    market: Optional[str] = Field(None, description="市场（主板/创业板/科创板）", example="主板")
+    list_date: Optional[str] = Field(None, description="上市日期", example="19910403")
+
+class AStockListResponse(BaseModel):
+    count: int = Field(..., description="股票数量")
+    update_time: str = Field(..., description="数据更新时间")
+    items: List[AStockListItem] = Field(..., description="股票列表")
 
 class TestApiResponse(BaseModel):
     success: bool = Field(..., description="测试是否成功")
@@ -703,6 +719,95 @@ async def need_login():
     ```
     """
     return {"require_login": REQUIRE_LOGIN}
+
+# 获取A股股票列表
+@app.get("/api/a_stock_list", response_model=AStockListResponse, responses={
+    200: {"description": "获取成功", "model": AStockListResponse},
+    401: {"description": "未授权", "model": ErrorResponse},
+    500: {"description": "服务器内部错误", "model": ErrorResponse}
+})
+async def get_a_stock_list(force_refresh: bool = False, username: str = Depends(verify_token)):
+    """
+    获取A股股票列表
+    
+    返回全量A股股票列表，包含代码、名称、行业等基础信息。数据每日15点后更新一次。
+    
+    - **force_refresh**: 是否强制刷新缓存，默认为False
+    
+    返回:
+    - **count**: 股票数量
+    - **update_time**: 数据更新时间
+    - **items**: 股票列表
+    
+    示例响应:
+    ```json
+    {
+      "count": 5000,
+      "update_time": "2025-04-29 15:30:00",
+      "items": [
+        {
+          "ts_code": "000001.SZ",
+          "symbol": "000001",
+          "name": "平安银行",
+          "area": "深圳",
+          "industry": "银行",
+          "market": "主板",
+          "list_date": "19910403"
+        },
+        {
+          "ts_code": "000002.SZ",
+          "symbol": "000002",
+          "name": "万科A",
+          "area": "深圳",
+          "industry": "房地产",
+          "market": "主板",
+          "list_date": "19910129"
+        }
+      ]
+    }
+    ```
+    """
+    try:
+        logger.info(f"开始获取A股股票列表, force_refresh={force_refresh}")
+        
+        # 从服务获取股票列表
+        stock_list_df = await a_stock_list_service.get_stock_list(force_refresh=force_refresh)
+        
+        # 转换为响应格式
+        stock_list = stock_list_df.to_dict(orient='records')
+        
+        # 获取更新时间
+        cache_file = a_stock_list_service.cache_file
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cache_data = json.load(f)
+                    update_time = cache_data.get('update_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            except Exception as e:
+                logger.error(f"读取缓存文件更新时间出错: {str(e)}")
+                update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            update_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # 构建响应
+        response = {
+            "count": len(stock_list),
+            "update_time": update_time,
+            "items": stock_list
+        }
+        
+        logger.info(f"A股股票列表获取成功，共{len(stock_list)}条记录")
+        return response
+    
+    except Exception as e:
+        error_msg = f"获取A股股票列表时出错: {str(e)}"
+        logger.error(error_msg)
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 # 设置静态文件
 frontend_dist = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend', 'dist')
