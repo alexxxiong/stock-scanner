@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stock-scanner.fullname" . }}-config
+  labels:
+    {{- include "stock-scanner.labels" . | nindent 4 }}
+data:
+  # 应用配置
+  API_URL: {{ .Values.config.apiUrl | quote }}
+  API_MODEL: {{ .Values.config.apiModel | quote }}
+  API_TIMEOUT: {{ .Values.config.apiTimeout | quote }}
+  ANNOUNCEMENT_TEXT: {{ .Values.config.announcementText | quote }}
+  MODE: {{ .Values.config.mode | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  TUSHARE_TOKEN: {{ .Values.config.tushareToken | quote }}
+  
+  # 系统配置
+  {{- range $key, $value := .Values.config.extra }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }} 

@@ -45,16 +45,25 @@ spec:
             - name: http
               containerPort: 8888
               protocol: TCP
+            - name: health
+              containerPort: 8080
+              protocol: TCP
           livenessProbe:
             {{- toYaml .Values.backend.livenessProbe | nindent 12 }}
           readinessProbe:
             {{- toYaml .Values.backend.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ $fullname }}-config
+            - secretRef:
+                name: {{ $fullname }}-secret
+          # 添加自定义环境变量（优先级高于ConfigMap和Secret）
+          {{- if .Values.backend.env }}
           env:
-            {{- if .Values.backend.env }}
             {{- toYaml .Values.backend.env | nindent 12 }}
-            {{- end }}
+          {{- end }}
           volumeMounts:
             {{- if .Values.backend.persistence.enabled }}
             - name: data

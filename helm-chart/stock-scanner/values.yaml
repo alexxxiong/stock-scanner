@@ -13,10 +13,11 @@ backend:
   image:
     repository: k8sf/stock-scanner
     pullPolicy: IfNotPresent
-    tag: "latest"
+    tag: "0.1"
   service:
     type: ClusterIP
     port: 8888
+    healthPort: 8080  # 健康检查端口
   resources:
     limits:
       cpu: 1000m
@@ -26,39 +27,24 @@ backend:
       memory: 512Mi
   livenessProbe:
     httpGet:
-      path: /api/config
-      port: 8888
+      path: /health
+      port: 8080
     initialDelaySeconds: 30
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
   readinessProbe:
     httpGet:
-      path: /api/config
-      port: 8888
+      path: /health
+      port: 8080
     initialDelaySeconds: 10
     periodSeconds: 5
     timeoutSeconds: 3
     failureThreshold: 3
-  env:
-    - name: API_KEY
-      value: "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"
-    - name: API_URL
-      value: "https://openrouter.ai/api"
-    - name: API_MODEL
-      value: "google/gemini-2.5-pro-exp-03-25"
-    - name: API_TIMEOUT
-      value: "60"
-    - name: TOKEN
-      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
-    - name: ANNOUNCEMENT_TEXT
-      value: "欢迎使用股票分析系统"
-    - name: MODE
-      value: "DEBUG"
-    - name: LOG_LEVEL
-      value: "TRACE"
-    - name: USER_TOKEN
-      value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+  # 保留env字段以兼容旧版本
+  env: []
+  # - name: CUSTOM_ENV
+  #   value: "custom_value"
   persistence:
     enabled: true
     storageClass: ""
@@ -69,11 +55,34 @@ backend:
     logs:
       mountPath: /app/logs
 
+# 应用配置 (ConfigMap)
+config:
+  apiUrl: "https://openrouter.ai/api"
+  apiModel: "tngtech/deepseek-r1t-chimera:free"
+  apiTimeout: "60"
+  announcementText: "欢迎使用股票分析系统"
+  mode: "DEBUG"
+  logLevel: "TRACE"
+  tushareToken: "30dd89a41c53facb136d77f8ba652b5963fe96919483ac2a4a111a4f"
+  extra: {}
+    # 添加额外的配置项
+    # CUSTOM_CONFIG: "value"
+
+# 敏感信息配置 (Secret)
+secret:
+  apiKey: "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"
+  token: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+  userToken: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+  extra: {}
+    # 添加额外的敏感信息
+    # DATABASE_PASSWORD: "password"
+
 # 服务配置
 service:
   type: ClusterIP
   port: 80
   backendPort: 8888
+  healthPort: 8080
 
 imagePullSecrets: []
 
@@ -125,27 +134,6 @@ autoscaling:
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
-
-# 环境变量配置
-env:
-  - name: API_KEY
-    value: "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"
-  - name: API_URL
-    value: "https://openrouter.ai/api"
-  - name: API_MODEL
-    value: "google/gemini-2.5-pro-exp-03-25"
-  - name: API_TIMEOUT
-    value: "60"
-  - name: TOKEN
-    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
-  - name: ANNOUNCEMENT_TEXT
-    value: "欢迎使用股票分析系统"
-  - name: MODE
-    value: "DEBUG"
-  - name: LOG_LEVEL
-    value: "TRACE"
-  - name: USER_TOKEN
-    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
 
 # 持久卷配置
 persistence:
