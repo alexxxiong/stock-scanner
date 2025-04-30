@@ -43,7 +43,7 @@ COPY services/ ./services/
 
 # 创建虚拟环境并安装Python依赖
 RUN uv venv /app/.venv --python 3.10 && \
-    uv pip install --no-cache-dir -r requirements.txt
+    uv pip install --no-build  --no-cache-dir -r requirements.txt
 
 # 从前端构建阶段复制构建后的文件
 COPY --from=frontend-builder /app/frontend/dist/ /app/frontend/dist/

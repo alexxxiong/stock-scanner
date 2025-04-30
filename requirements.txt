@@ -18,7 +18,8 @@ httpx>=0.28.1
 python-dotenv>=1.0.1
 
 # 日志和系统工具
-loguru>=0.7.2
+loguru
+psutil
 
 # 可选：数据可视化（未来扩展）
 matplotlib>=3.7.2

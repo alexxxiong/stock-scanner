@@ -20,6 +20,9 @@ import secrets
 import traceback
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+import time
+import psutil
+import threading
 
 load_dotenv()
 
@@ -132,6 +135,13 @@ class TestApiResponse(BaseModel):
     success: bool = Field(..., description="测试是否成功")
     message: str = Field(..., description="测试结果消息")
     status_code: Optional[int] = Field(None, description="HTTP状态码")
+
+class HealthResponse(BaseModel):
+    status: str = Field(..., description="系统状态", example="ok")
+    version: str = Field(..., description="系统版本", example="1.0.0")
+    uptime: str = Field(..., description="系统运行时间", example="1d 2h 3m 4s")
+    memory_usage: Optional[str] = Field(None, description="内存使用率", example="60.5%")
+    cpu_usage: Optional[str] = Field(None, description="CPU使用率", example="25.3%")
 
 class ErrorResponse(BaseModel):
     detail: str = Field(..., description="错误详情")
@@ -818,6 +828,83 @@ if os.path.exists(frontend_dist):
 else:
     logger.warning("前端构建目录不存在，仅API功能可用")
 
+# 记录启动时间，用于计算系统运行时间
+STARTUP_TIME = time.time()
+APP_VERSION = "1.0.0"
+
+# 创建单独的健康检查应用，在不同端口上运行
+health_app = FastAPI(
+    title="Stock Scanner Admin API",
+    description="股票分析系统管理接口",
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+)
+
+# 健康检查接口
+@health_app.get("/health", response_model=HealthResponse, responses={
+    200: {"description": "系统正常", "model": HealthResponse},
+    500: {"description": "系统异常", "model": ErrorResponse}
+})
+async def health_check():
+    """
+    系统健康状态检查
+    
+    用于Kubernetes存活探针和就绪探针，返回系统当前状态和运行信息
+    
+    返回:
+    - **status**: 系统状态，"ok"表示正常，"error"表示异常
+    - **version**: 系统版本号
+    - **uptime**: 系统运行时间
+    - **memory_usage**: 内存使用率（如果可用）
+    - **cpu_usage**: CPU使用率（如果可用）
+    """
+    try:
+        # 计算系统运行时间
+        uptime_seconds = int(time.time() - STARTUP_TIME)
+        days, remainder = divmod(uptime_seconds, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
+        
+        # 尝试获取系统资源使用情况
+        try:
+            memory_usage = f"{psutil.virtual_memory().percent}%"
+            cpu_usage = f"{psutil.cpu_percent(interval=0.1)}%"
+        except:
+            memory_usage = None
+            cpu_usage = None
+            
+        return {
+            "status": "ok",
+            "version": APP_VERSION,
+            "uptime": uptime_str,
+            "memory_usage": memory_usage,
+            "cpu_usage": cpu_usage
+        }
+    except Exception as e:
+        error_msg = f"健康检查出错: {str(e)}"
+        logger.error(error_msg)
+        if TRACE_ENABLED:
+            trace_info = traceback.format_exc()
+            logger.error(f"错误堆栈: \n{trace_info}")
+        else:
+            logger.exception(e)
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "detail": error_msg}
+        )
+
+# 启动健康检查服务的函数
+def start_health_service():
+    uvicorn.run(health_app, host="0.0.0.0", port=8080)
 
 if __name__ == '__main__':
+    # 启动健康检查服务在单独的线程
+    health_thread = threading.Thread(target=start_health_service, daemon=True)
+    health_thread.start()
+    logger.info("健康检查服务已在端口8080启动")
+    
+    # 启动主应用
     uvicorn.run("web_server:app", host="0.0.0.0", port=8888, reload=True)

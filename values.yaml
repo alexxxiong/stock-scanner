@@ -8,87 +8,70 @@ replicaCount: 1
 nameOverride: "stock-scanner"
 fullnameOverride: "stock-scanner"
 
-frontend:
-  image:
-    repository: k8sf/stock-scanner-front
-    pullPolicy: IfNotPresent
-    tag: "latest"
-  service:
-    type: ClusterIP
-    port: 80
-  livenessProbe:
-    httpGet:
-      path: /
-      port: http
-    initialDelaySeconds: 30
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /
-      port: http
-    initialDelaySeconds: 5
-    periodSeconds: 5
-  resources:
-    limits:
-      cpu: 200m
-      memory: 256Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
-
+# 后端服务配置
 backend:
   image:
-    repository: k8sf/stock-scanner-end
+    repository: k8sf/stock-scanner
     pullPolicy: IfNotPresent
-    tag: "latest"
+    tag: "0.1"
   service:
     type: ClusterIP
     port: 8888
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
   livenessProbe:
     httpGet:
       path: /api/config
-      port: http
+      port: 8888
     initialDelaySeconds: 30
     periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
   readinessProbe:
     httpGet:
       path: /api/config
-      port: http
-    initialDelaySeconds: 5
+      port: 8888
+    initialDelaySeconds: 10
     periodSeconds: 5
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 200m
-      memory: 256Mi
-  persistence:
-    enabled: true
-    data:
-      mountPath: /app/data
-    logs:
-      mountPath: /app/logs
+    timeoutSeconds: 3
+    failureThreshold: 3
   env:
     - name: API_KEY
       value: "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"
     - name: API_URL
       value: "https://openrouter.ai/api"
     - name: API_MODEL
-      value: "google/gemini-2.5-pro-exp-03-25"
+      value: "tngtech/deepseek-r1t-chimera:free"
     - name: API_TIMEOUT
       value: "60"
     - name: TOKEN
       value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+    - name: ANNOUNCEMENT_TEXT
+      value: "欢迎使用股票分析系统"
     - name: MODE
       value: "DEBUG"
     - name: LOG_LEVEL
       value: "TRACE"
-    - name: ANNOUNCEMENT_TEXT
-      value: "欢迎使用股票分析系统"
     - name: USER_TOKEN
       value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
+    - name: TUSHARE_TOKEN
+      value: "30dd89a41c53facb136d77f8ba652b5963fe96919483ac2a4a111a4f"
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+    data:
+      mountPath: /app/data
+    logs:
+      mountPath: /app/logs
 
+# 服务配置
 service:
   type: ClusterIP
   port: 80
@@ -99,6 +82,8 @@ imagePullSecrets: []
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -106,6 +91,7 @@ serviceAccount:
   name: ""
 
 podAnnotations: {}
+podLabels: {}
 
 podSecurityContext: {}
   # fsGroup: 2000
@@ -138,50 +124,33 @@ ingress:
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 5
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-# 环境变量配置
-env:
-  - name: API_KEY
-    value: "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"
-  - name: API_URL
-    value: "https://openrouter.ai/api"
-  - name: API_MODEL
-    value: "google/gemini-2.5-pro-exp-03-25"
-  - name: API_TIMEOUT
-    value: "60"
-  - name: TOKEN
-    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
-  - name: ANNOUNCEMENT_TEXT
-    value: "欢迎使用股票分析系统"
-  - name: MODE
-    value: "DEBUG"
-  - name: LOG_LEVEL
-    value: "TRACE"
-  - name: USER_TOKEN
-    value: "j3wYD9mO0je5yPm20vfqUnTqpeWjhLGRmIO5hcZNqDY="
-
-# 持久化存储配置
+# 持久卷配置
 persistence:
   enabled: true
-  ## 如果不使用已有的PVC，会创建新的
-  # existingClaim: 
-  
-  ## 数据卷模式：ReadWriteOnce, ReadOnlyMany 或 ReadWriteMany
+  storageClass: ""
   accessMode: ReadWriteOnce
-  
-  ## 数据卷大小
   size: 5Gi
-  
-  ## 持久卷StorageClass
-  ## 如果设置为"-"，则使用默认StorageClass
-  ## 如果设置为""，则不使用StorageClass
-  # storageClass: "-"
-  
-  ## 存储注解
-  annotations: {}
+  data:
+    mountPath: /app/data
+  logs:
+    mountPath: /app/logs
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
 
 # 资源配置
 resources:
@@ -196,4 +165,4 @@ nodeSelector: {}
 
 tolerations: []
 
-affinity: {} 
+affinity: {}

@@ -304,7 +304,7 @@ class AIAnalyzer:
                                             })
                                     except json.JSONDecodeError:
                                         # 记录解析错误并尝试恢复
-                                        logger.error(f"JSON解析错误，块内容: {line}")
+                                        # logger.error(f"JSON解析错误，块内容: {line}")
                                         
                                         # 如果是特定错误模式，处理它
                                         if "streaming failed after retries" in line.lower():
